@@ -6,6 +6,8 @@ I wanted a boilerplate that was literally "drag and drop" - I'm pretty happy wit
 
 It is compatible with Android devices running Ice Cream Sandwich and higher (API 22).
 
+<img src="https://github.com/nabilfreeman/android-webview-boilerplate/raw/master/readme-screenshots/telefono.png" alt="the finished product!" width="450">
+
 # Setup
 - Clone this repo, or hit "Download ZIP" in the Github sidebar.
 
@@ -26,8 +28,6 @@ There are some extra settings in `MainActivity.java` too. They're all code comme
 
 - Toggle Javascript
 - Toggle the opening of a full browser when a user clicks a link.
-
-<img src="https://github.com/nabilfreeman/android-webview-boilerplate/raw/master/readme-screenshots/telefono.png" alt="the finished product!" width="450">
 
 # Why?
 
