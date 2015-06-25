@@ -1,10 +1,10 @@
 # Simple Webview Boilerplate for Android Studio
 
-This is an Android Studio Universal project that allows you to wrap your website or web app in a super simple Android app.
+This is an Android Studio project that allows you to wrap your website or web app in a super simple Android app.
+
+I wanted a boilerplate that was literally "drag and drop" - I'm pretty happy with this result. Originally, I forked slymax's webview repo but I ended up deleting all the code and making a new branch. I got inspiration from him though so thanks!
 
 It is compatible with Android devices running Ice Cream Sandwich and higher (API 22).
-
-I might make this boilerplate fully backwards-compatible down the road.
 
 # Setup
 - Clone this repo, or hit "Download ZIP" in the Github sidebar.
