@@ -37,6 +37,8 @@ public class MainActivity extends Activity {
 
         //one is for loading a URL (external-only for production lol)...
         //the other is for loading an in-app HTML file (located in X).
-        frame.loadUrl("http://10.0.2.2/");
+
+        //frame.loadUrl("http://10.0.2.2/");
+        frame.loadUrl("file:///android_asset/web_content/index.html");
     }
 }

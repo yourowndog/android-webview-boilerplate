@@ -10,7 +10,7 @@ I might make this boilerplate fully backwards-compatible down the road.
 - Clone this repo, or hit "Download ZIP" in the Github sidebar.
 
 ### Local mode (recommended)
-- Replace the stuff in `web_content` with your own mobile website.
+- Replace the stuff in `app/src/main/assets/web_content` with your own mobile website.
 - Hit Run!
 
 ### Internet mode
