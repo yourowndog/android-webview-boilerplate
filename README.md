@@ -18,7 +18,7 @@ I might make this boilerplate fully backwards-compatible down the road.
 - Set your URL...
 - Hit Run!
 
-![MainActivity.java location within the boilerplate](https://github.com/nabilfreeman/android-webview-boilerplate/raw/new-version/readme-screenshots/files.png)
+<img src="https://github.com/nabilfreeman/android-webview-boilerplate/raw/new-version/readme-screenshots/files.png" alt="MainActivity.java location within the boilerplate" width="650">
 
 ### Bonus settings
 
