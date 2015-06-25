@@ -27,7 +27,7 @@ There are some extra settings in `MainActivity.java` too. They're all code comme
 - Toggle Javascript
 - Toggle the opening of a full browser when a user clicks a link.
 
-<img src="https://github.com/nabilfreeman/android-webview-boilerplate/raw/master/readme-screenshots/telefono.png" alt="the finished product!" width="650">
+<img src="https://github.com/nabilfreeman/android-webview-boilerplate/raw/master/readme-screenshots/telefono.png" alt="the finished product!" width="450">
 
 # Why?
 
