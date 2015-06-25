@@ -22,7 +22,10 @@ I might make this boilerplate fully backwards-compatible down the road.
 
 ### Bonus settings
 
-You can enable/disable Javascript, and also enable-disable the opening of a full browser when a user clicks a link in `MainActivity.java` (see above screenshot).
+There are some extra settings in `MainActivity.java` too. They're all code commented so check out the file!
+
+- Toggle Javascript
+- Toggle the opening of a full browser when a user clicks a link.
 
 # Why?
 
