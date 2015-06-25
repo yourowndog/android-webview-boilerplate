@@ -18,7 +18,7 @@ It is compatible with Android devices running Ice Cream Sandwich and higher (API
 - Set your URL...
 - Hit Run!
 
-<img src="https://github.com/nabilfreeman/android-webview-boilerplate/raw/new-version/readme-screenshots/files.png" alt="MainActivity.java location within the boilerplate" width="650">
+<img src="https://github.com/nabilfreeman/android-webview-boilerplate/raw/master/readme-screenshots/files.png" alt="MainActivity.java location within the boilerplate" width="650">
 
 ### Bonus settings
 
