@@ -27,6 +27,8 @@ There are some extra settings in `MainActivity.java` too. They're all code comme
 - Toggle Javascript
 - Toggle the opening of a full browser when a user clicks a link.
 
+<img src="https://github.com/nabilfreeman/android-webview-boilerplate/raw/master/readme-screenshots/telefono.png" alt="the finished product!" width="650">
+
 # Why?
 
 So you can easily build an Android app in HTML/CSS/JS without using Cordova. And, as awesome as the Chrome home screen bookmark stuff is, for certain projects it might make a lot more sense if people can search through the Google Play / Amazon store.
