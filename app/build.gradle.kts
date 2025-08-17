@@ -15,6 +15,7 @@ android {
         versionName = "1.0.2"
 
         buildConfigField("String","HOME_URL","\"https://chatgpt.com/\"")
+        buildConfigField("String","LOGIN_REDIRECT_URL","\"https://chatgpt.com/g/g-68320ed4e74081919f11e7d6a993ee44-the-daemon\"")
         buildConfigField("boolean","FORCE_DESKTOP_MODE","true")
         buildConfigField("boolean","ALLOW_THIRD_PARTY_COOKIES","true")
     }

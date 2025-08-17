@@ -7,7 +7,13 @@ Daemon Portal is a single-activity WebView app written in Kotlin. It loads a con
 Set the `HOME_URL` value in [`app/build.gradle.kts`](app/build.gradle.kts). By default it points to:
 
 ```
-https://chatgpt.com/g/g-XXXXXXXXXXXXXXX-the-daemon
+https://chatgpt.com/
+```
+
+The `LOGIN_REDIRECT_URL` defines where the app navigates after a successful sign in. By default it opens:
+
+```
+https://chatgpt.com/g/g-68320ed4e74081919f11e7d6a993ee44-the-daemon
 ```
 
 ## Build
