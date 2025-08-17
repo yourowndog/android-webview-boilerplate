@@ -1,26 +1,34 @@
 package com.daemon.portal
 
 import android.Manifest
+import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Message
 import android.view.Menu
 import android.view.MenuItem
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebStorage
+import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
+    private lateinit var statusView: TextView
+    private var isLoggedIn = false
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
     private val prefs by lazy { getSharedPreferences("portal", MODE_PRIVATE) }
@@ -29,6 +37,33 @@ class MainActivity : AppCompatActivity() {
     private fun setStartUrl(u: String) { prefs.edit().putString("start_url", u).apply() }
     private fun getTargetAfterLogin(): String? = prefs.getString("target_after_login", null)
     private fun setTargetAfterLogin(u: String?) { prefs.edit().putString("target_after_login", u).apply() }
+    private fun onLoggedIn() {
+        isLoggedIn = true
+        statusView.text = "Signed in"
+        val target = getTargetAfterLogin()
+        if (target != null) {
+            setTargetAfterLogin(null)
+            webView.post { webView.loadUrl(target) }
+        }
+    }
+
+    private fun onLoggedOut() {
+        isLoggedIn = false
+        statusView.text = "Not signed in"
+        val current = webView.url
+        if (current != null && Uri.parse(current).path?.startsWith("/g/") == true) {
+            setTargetAfterLogin(current)
+            webView.loadUrl(BuildConfig.HOME_URL)
+        }
+    }
+
+    inner class JsBridge {
+        @JavascriptInterface
+        fun loggedIn() { runOnUiThread { onLoggedIn() } }
+
+        @JavascriptInterface
+        fun loggedOut() { runOnUiThread { onLoggedOut() } }
+    }
 
     private val fileChooser =
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -48,7 +83,50 @@ class MainActivity : AppCompatActivity() {
         ))
 
         webView = WebView(this)
-        setContentView(webView)
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        statusView = TextView(this).apply {
+            setBackgroundColor(Color.BLACK)
+            setTextColor(Color.WHITE)
+            text = "Checking..."
+        }
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(Color.BLACK)
+        }
+        val reload = Button(this).apply {
+            text = "Reload"
+            setTextColor(Color.WHITE)
+        }
+        val home = Button(this).apply {
+            text = "Home"
+            setTextColor(Color.WHITE)
+        }
+        val openChrome = Button(this).apply {
+            text = "Chrome"
+            setTextColor(Color.WHITE)
+        }
+        val clearCookies = Button(this).apply {
+            text = "Clear"
+            setTextColor(Color.WHITE)
+        }
+        actions.addView(statusView)
+        actions.addView(reload)
+        actions.addView(home)
+        actions.addView(openChrome)
+        actions.addView(clearCookies)
+        root.addView(actions)
+        root.addView(webView, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT)
+        setContentView(root)
+
+        reload.setOnClickListener { webView.reload() }
+        home.setOnClickListener { webView.loadUrl(getStartUrl()) }
+        openChrome.setOnClickListener {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(webView.url ?: getStartUrl()))
+            startActivity(intent)
+        }
+        clearCookies.setOnClickListener {
+            CookieManager.getInstance().removeAllCookies { webView.loadUrl(BuildConfig.HOME_URL) }
+        }
 
         val settings = webView.settings
         settings.javaScriptEnabled = true
@@ -63,10 +141,12 @@ class MainActivity : AppCompatActivity() {
             settings.userAgentString =
                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         }
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
+        cookieManager.setAcceptThirdPartyCookies(webView, true)
+        WebStorage.getInstance()
 
-        if (BuildConfig.ALLOW_THIRD_PARTY_COOKIES) {
-            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
-        }
+        webView.addJavascriptInterface(JsBridge(), "Android")
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
@@ -106,30 +186,17 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
-            override fun onReceivedHttpError(
-                view: WebView,
-                request: WebResourceRequest,
-                errorResponse: WebResourceResponse,
-            ) {
-                val url = request.url
-                if (
-                    request.isForMainFrame &&
-                    url.host?.endsWith("chatgpt.com") == true &&
-                    url.path?.startsWith("/g/") == true &&
-                    errorResponse.statusCode in setOf(401, 403, 404)
-                ) {
-                    setTargetAfterLogin(url.toString())
-                    view.loadUrl(BuildConfig.HOME_URL)
-                }
-            }
-
             override fun onPageFinished(view: WebView, url: String) {
-                val uri = Uri.parse(url)
-                val target = getTargetAfterLogin()
-                if (uri.host == "chatgpt.com" && target != null && !url.contains("/g/")) {
-                    setTargetAfterLogin(null)
-                    view.postDelayed({ view.loadUrl(target) }, 300)
-                }
+                view.evaluateJavascript(
+                    """
+                    (async () => {
+                      try {
+                        const r = await fetch('/api/auth/session', {credentials:'include'});
+                        if (r.ok) { Android.loggedIn(); } else { Android.loggedOut(); }
+                      } catch(e) { Android.loggedOut(); }
+                    })();
+                    """.trimIndent(), null
+                )
             }
         }
 
