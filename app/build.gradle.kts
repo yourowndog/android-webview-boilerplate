@@ -1,6 +1,6 @@
 plugins {
     id("com.android.application")
-    kotlin("android")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -11,8 +11,8 @@ android {
         applicationId = "com.daemon.portal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.0.5"
+        versionCode = 7
+        versionName = "1.0.6"
 
         buildConfigField("String", "HOME_URL", "\"https://chatgpt.com/g/g-68320ed4e74081919f11e7d6a993ee44-the-daemon\"")
         buildConfigField("boolean", "FORCE_DESKTOP_MODE", "true")

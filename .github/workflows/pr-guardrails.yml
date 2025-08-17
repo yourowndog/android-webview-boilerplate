@@ -1,4 +1,4 @@
-name: pr-sanity
+name: pr-guardrails
 on: { pull_request: { types: [opened, synchronize, reopened] } }
 permissions: { contents: read }
 jobs:
