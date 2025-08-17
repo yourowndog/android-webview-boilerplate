@@ -1,62 +1,39 @@
 package com.daemon.portal
 
 import android.Manifest
-import android.content.Intent
-import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Message
 import android.view.Menu
 import android.view.MenuItem
 import android.webkit.CookieManager
-import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebStorage
-import android.webkit.WebResourceResponse
-import android.widget.Button
 import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
-    private lateinit var statusView: TextView
-    private var isLoggedIn = false
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
-    private var pendingUrl: String? = null
-
     private val prefs by lazy { getSharedPreferences("portal", MODE_PRIVATE) }
 
-    private fun getStartUrl(): String = prefs.getString("start_url", BuildConfig.HOME_URL)!!
+    enum class AuthState { Unknown, LoggedOut, SeekingLogin, LoggedIn }
+
+    private var authState: AuthState = AuthState.Unknown
+    private var targetAfterLogin: String? = null
+
+    private fun getStartUrl(): String = prefs.getString("start_url", BuildConfig.HOME_URL) ?: BuildConfig.HOME_URL
     private fun setStartUrl(u: String) { prefs.edit().putString("start_url", u).apply() }
-    private fun onLoggedIn() {
-        isLoggedIn = true
-        statusView.text = "Signed in"
-        val target = pendingUrl ?: getStartUrl()
-        pendingUrl = null
-        webView.post { webView.loadUrl(target) }
-    }
-
-    private fun onLoggedOut() {
-        isLoggedIn = false
-        statusView.text = "Not signed in"
-    }
-
-    inner class JsBridge {
-        @JavascriptInterface
-        fun loggedIn() { runOnUiThread { onLoggedIn() } }
-
-        @JavascriptInterface
-        fun loggedOut() { runOnUiThread { onLoggedOut() } }
-    }
+    private fun setTargetAfterLogin(u: String?) { prefs.edit().putString("target_after_login", u).apply() }
+    private fun getTargetAfterLogin(): String? = prefs.getString("target_after_login", null)
 
     private val fileChooser =
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -76,50 +53,7 @@ class MainActivity : AppCompatActivity() {
         ))
 
         webView = WebView(this)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        statusView = TextView(this).apply {
-            setBackgroundColor(Color.BLACK)
-            setTextColor(Color.WHITE)
-            text = "Checking..."
-        }
-        val actions = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.BLACK)
-        }
-        val reload = Button(this).apply {
-            text = "Reload"
-            setTextColor(Color.WHITE)
-        }
-        val home = Button(this).apply {
-            text = "Home"
-            setTextColor(Color.WHITE)
-        }
-        val openChrome = Button(this).apply {
-            text = "Chrome"
-            setTextColor(Color.WHITE)
-        }
-        val clearCookies = Button(this).apply {
-            text = "Clear"
-            setTextColor(Color.WHITE)
-        }
-        actions.addView(statusView)
-        actions.addView(reload)
-        actions.addView(home)
-        actions.addView(openChrome)
-        actions.addView(clearCookies)
-        root.addView(actions)
-        root.addView(webView, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT)
-        setContentView(root)
-
-        reload.setOnClickListener { webView.reload() }
-        home.setOnClickListener { webView.loadUrl(getStartUrl()) }
-        openChrome.setOnClickListener {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(webView.url ?: getStartUrl()))
-            startActivity(intent)
-        }
-        clearCookies.setOnClickListener {
-            CookieManager.getInstance().removeAllCookies { webView.loadUrl(BuildConfig.HOME_URL) }
-        }
+        setContentView(webView)
 
         val settings = webView.settings
         settings.javaScriptEnabled = true
@@ -129,17 +63,15 @@ class MainActivity : AppCompatActivity() {
         settings.javaScriptCanOpenWindowsAutomatically = true
         settings.setSupportMultipleWindows(true)
         settings.allowFileAccess = true
-
         if (BuildConfig.FORCE_DESKTOP_MODE) {
             settings.userAgentString =
                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         }
+
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, BuildConfig.ALLOW_THIRD_PARTY_COOKIES)
         WebStorage.getInstance()
-
-        webView.addJavascriptInterface(JsBridge(), "Android")
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
@@ -164,7 +96,7 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 val href = view?.hitTestResult?.extra
                 if (href != null) {
-                    view.loadUrl(href)
+                    webView.loadUrl(href)
                 }
                 return false
             }
@@ -175,7 +107,13 @@ class MainActivity : AppCompatActivity() {
                 view: WebView,
                 request: WebResourceRequest,
             ): Boolean {
-                view.loadUrl(request.url.toString())
+                val url = request.url.toString()
+                if (url.startsWith("intent://") || url.startsWith("android-app://")) {
+                    return true
+                }
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                    view.loadUrl(url)
+                }
                 return true
             }
 
@@ -186,29 +124,64 @@ class MainActivity : AppCompatActivity() {
             ) {
                 if (request.isForMainFrame) {
                     val code = errorResponse.statusCode
-                    val url = request.url.toString()
-                    if (url.startsWith("https://chatgpt.com/g/") && (code == 401 || code == 403 || code == 404)) {
-                        pendingUrl = url
-                        view.loadUrl("https://chatgpt.com/")
+                    val url = request.url
+                    if (url.host == "chatgpt.com" && url.path?.startsWith("/g/") == true &&
+                        (code == 401 || code == 403 || code == 404)
+                    ) {
+                        if (authState != AuthState.SeekingLogin) {
+                            authState = AuthState.SeekingLogin
+                            setTargetAfterLogin(request.url.toString())
+                            webView.loadUrl("file:///android_asset/landing.html")
+                        }
                     }
                 }
             }
 
             override fun onPageFinished(view: WebView, url: String) {
-                view.evaluateJavascript(
-                    """
-                    (async () => {
-                      try {
-                        const r = await fetch('/api/auth/session', {credentials:'include'});
-                        if (r.ok) { Android.loggedIn(); } else { Android.loggedOut(); }
-                      } catch(e) { Android.loggedOut(); }
-                    })();
-                    """.trimIndent(), null
-                )
+                evaluateSession { loggedIn ->
+                    if (loggedIn) {
+                        if (authState != AuthState.LoggedIn) authState = AuthState.LoggedIn
+                        getTargetAfterLogin()?.let { t ->
+                            setTargetAfterLogin(null)
+                            if (!view.url.orEmpty().startsWith(t)) {
+                                view.postDelayed({ view.loadUrl(t) }, 200)
+                            }
+                        }
+                    } else {
+                        if (authState == AuthState.Unknown) authState = AuthState.LoggedOut
+                    }
+                }
             }
         }
 
-        webView.loadUrl(getStartUrl())
+        preflightAndNavigate(getStartUrl())
+    }
+
+    private fun preflightAndNavigate(target: String) {
+        evaluateSession { loggedIn ->
+            if (loggedIn) {
+                authState = AuthState.LoggedIn
+                webView.loadUrl(target)
+            } else {
+                authState = AuthState.LoggedOut
+                setTargetAfterLogin(target)
+                webView.loadUrl("file:///android_asset/landing.html")
+            }
+        }
+    }
+
+    private fun evaluateSession(cb: (Boolean) -> Unit) {
+        val probe = "https://chatgpt.com/"
+        val js = """
+          (async () => {
+            try {
+              const r = await fetch('/api/auth/session', {credentials:'include'});
+              return r.ok;
+            } catch (e) { return false; }
+          })();
+        """.trimIndent()
+        if (webView.url == null) webView.loadUrl(probe)
+        webView.postDelayed({ webView.evaluateJavascript(js) { s -> cb(s?.contains("true") == true) } }, 300)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
