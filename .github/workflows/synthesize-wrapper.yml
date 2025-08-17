@@ -1,0 +1,54 @@
+# .github/workflows/synthesize-wrapper.yml
+name: synthesize-wrapper
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'gradle/wrapper/gradle-wrapper.properties'
+      - '.github/workflows/synthesize-wrapper.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Ensure Gradle CLI
+        run: |
+          curl -sL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
+      - name: Re-generate wrapper
+        run: |
+          rm -f gradle/wrapper/gradle-wrapper.jar
+          gradle wrapper --gradle-version 8.7
+          test -f gradle/wrapper/gradle-wrapper.jar
+      - name: Check changes
+        id: delta
+        run: |
+          git add gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties
+          if git diff --cached --quiet; then echo "changed=false" >> $GITHUB_OUTPUT; else echo "changed=true" >> $GITHUB_OUTPUT; fi
+      - id: app-token
+        if: steps.delta.outputs.changed == 'true'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - name: Commit (or PR if protection)
+        if: steps.delta.outputs.changed == 'true'
+        env: { GH_TOKEN: ${{ steps.app-token.outputs.token }} }
+        run: |
+          git config user.name  "CodexPusher[bot]"
+          git config user.email "codexpusher[bot]@users.noreply.github.com"
+          git commit -m "ci: synthesize gradle-wrapper.jar"
+          set +e
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:master || {
+            BR="synth-wrapper-$(date +%s)"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:$BR
+            gh pr create --title "ci: synth wrapper" --body "Auto PR from synthesize-wrapper" --base master --head $BR
+          }

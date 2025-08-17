@@ -1,0 +1,32 @@
+# .github/workflows/pr-sanity.yml
+name: pr-sanity
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  no-binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Detect forbidden binary changes
+        run: |
+          set -e
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          # list changed paths, mark git's idea of "binary" or file extensions we ban
+          banned=$(git diff --name-only --diff-filter=ACMR $base $head | awk '
+            /(^|\/)gradle\/wrapper\/gradle-wrapper\.jar$/ {print; next}
+            /\.jar$/ || /\.apk$/ || /\.aab$/ || /\.keystore$/ || /\.png$/ || /\.webp$/ {print}
+          ')
+          if [ -n "$banned" ]; then
+            echo "::error::This PR contains binary files (not allowed for agent PRs):"
+            echo "$banned"
+            echo ""
+            echo "Keep PRs text-only. CI will synthesize gradle-wrapper.jar and any needed rasters."
+            exit 1
+          fi
