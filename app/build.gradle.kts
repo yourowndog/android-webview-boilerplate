@@ -11,10 +11,10 @@ android {
         applicationId = "com.daemon.portal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
-        buildConfigField("String","HOME_URL","\"https://chatgpt.com/g/XXXXXXXX-the-daemon\"")
+        buildConfigField("String","HOME_URL","\"https://chatgpt.com/\"")
         buildConfigField("boolean","FORCE_DESKTOP_MODE","true")
         buildConfigField("boolean","ALLOW_THIRD_PARTY_COOKIES","true")
     }
