@@ -25,12 +25,15 @@ class MainActivity : AppCompatActivity() {
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private val prefs by lazy { getSharedPreferences("portal", MODE_PRIVATE) }
 
+    private val chatHost = "chatgpt.com"
+    private fun loginUrlFor(target: String) =
+        "https://chatgpt.com/auth/login?return_to=" + Uri.encode(target)
+
     enum class AuthState { Unknown, LoggedOut, SeekingLogin, LoggedIn }
+    private var authState = AuthState.Unknown
 
-    private var authState: AuthState = AuthState.Unknown
-    private var targetAfterLogin: String? = null
-
-    private fun getStartUrl(): String = prefs.getString("start_url", BuildConfig.HOME_URL) ?: BuildConfig.HOME_URL
+    private fun getStartUrl(): String =
+        prefs.getString("start_url", BuildConfig.HOME_URL) ?: BuildConfig.HOME_URL
     private fun setStartUrl(u: String) { prefs.edit().putString("start_url", u).apply() }
     private fun setTargetAfterLogin(u: String?) { prefs.edit().putString("target_after_login", u).apply() }
     private fun getTargetAfterLogin(): String? = prefs.getString("target_after_login", null)
@@ -47,10 +50,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        permissionLauncher.launch(arrayOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO
-        ))
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.RECORD_AUDIO
+            )
+        )
 
         webView = WebView(this)
         setContentView(webView)
@@ -81,7 +86,7 @@ class MainActivity : AppCompatActivity() {
             override fun onShowFileChooser(
                 view: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
-                fileChooserParams: FileChooserParams?,
+                fileChooserParams: FileChooserParams?
             ): Boolean {
                 this@MainActivity.filePathCallback = filePathCallback
                 fileChooser.launch(arrayOf("*/*"))
@@ -89,99 +94,92 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onCreateWindow(
-                view: WebView?,
+                v: WebView,
                 isDialog: Boolean,
                 isUserGesture: Boolean,
-                resultMsg: Message?,
+                resultMsg: Message
             ): Boolean {
-                val href = view?.hitTestResult?.extra
-                if (href != null) {
-                    webView.loadUrl(href)
-                }
-                return false
+                val transport = resultMsg.obj as WebView.WebViewTransport
+                transport.webView = v
+                resultMsg.sendToTarget()
+                return true
             }
         }
 
         webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(
-                view: WebView,
-                request: WebResourceRequest,
-            ): Boolean {
-                val url = request.url.toString()
-                if (url.startsWith("intent://") || url.startsWith("android-app://")) {
-                    return true
+            override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
+                val u = r.url.toString()
+                return if (u.startsWith("http://") || u.startsWith("https://")) {
+                    v.loadUrl(u); true
+                } else {
+                    true
                 }
-                if (url.startsWith("http://") || url.startsWith("https://")) {
-                    view.loadUrl(url)
-                }
-                return true
             }
 
             override fun onReceivedHttpError(
-                view: WebView,
-                request: WebResourceRequest,
-                errorResponse: WebResourceResponse,
+                v: WebView,
+                req: WebResourceRequest,
+                resp: WebResourceResponse
             ) {
-                if (request.isForMainFrame) {
-                    val code = errorResponse.statusCode
-                    val url = request.url
-                    if (url.host == "chatgpt.com" && url.path?.startsWith("/g/") == true &&
-                        (code == 401 || code == 403 || code == 404)
-                    ) {
-                        if (authState != AuthState.SeekingLogin) {
-                            authState = AuthState.SeekingLogin
-                            setTargetAfterLogin(request.url.toString())
-                            webView.loadUrl("file:///android_asset/landing.html")
-                        }
+                if (req.isForMainFrame && req.url.host?.contains(chatHost) == true &&
+                    req.url.encodedPath?.startsWith("/g/") == true &&
+                    resp.statusCode in listOf(401, 403, 404)
+                ) {
+                    if (authState != AuthState.SeekingLogin) {
+                        authState = AuthState.SeekingLogin
+                        setTargetAfterLogin(req.url.toString())
+                        v.loadUrl(loginUrlFor(getTargetAfterLogin() ?: BuildConfig.HOME_URL))
                     }
                 }
             }
 
-            override fun onPageFinished(view: WebView, url: String) {
-                evaluateSession { loggedIn ->
-                    if (loggedIn) {
-                        if (authState != AuthState.LoggedIn) authState = AuthState.LoggedIn
-                        getTargetAfterLogin()?.let { t ->
-                            setTargetAfterLogin(null)
-                            if (!view.url.orEmpty().startsWith(t)) {
-                                view.postDelayed({ view.loadUrl(t) }, 200)
+            override fun onPageFinished(v: WebView, url: String) {
+                if (Uri.parse(url).host?.contains(chatHost) == true) {
+                    checkSession { loggedIn ->
+                        if (loggedIn) {
+                            authState = AuthState.LoggedIn
+                            getTargetAfterLogin()?.let { t ->
+                                setTargetAfterLogin(null)
+                                if (!url.startsWith(t)) v.postDelayed({ v.loadUrl(t) }, 150)
                             }
                         }
-                    } else {
-                        if (authState == AuthState.Unknown) authState = AuthState.LoggedOut
                     }
                 }
             }
         }
 
-        preflightAndNavigate(getStartUrl())
+        startFlow()
     }
 
-    private fun preflightAndNavigate(target: String) {
-        evaluateSession { loggedIn ->
+    private fun checkSession(cb: (Boolean) -> Unit) {
+        if (webView.url?.contains(chatHost) != true) {
+            webView.loadUrl("https://chatgpt.com/")
+            webView.postDelayed({ checkSession(cb) }, 250)
+            return
+        }
+        val js = """
+            (async () => {
+              try {
+                const r = await fetch('/api/auth/session', {credentials:'include'});
+                return r.ok;
+              } catch(e) { return false; }
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(js) { s -> cb(s?.contains("true") == true) }
+    }
+
+    private fun startFlow() {
+        val target = getStartUrl()
+        checkSession { loggedIn ->
             if (loggedIn) {
                 authState = AuthState.LoggedIn
                 webView.loadUrl(target)
             } else {
                 authState = AuthState.LoggedOut
                 setTargetAfterLogin(target)
-                webView.loadUrl("file:///android_asset/landing.html")
+                webView.loadUrl(loginUrlFor(target))
             }
         }
-    }
-
-    private fun evaluateSession(cb: (Boolean) -> Unit) {
-        val probe = "https://chatgpt.com/"
-        val js = """
-          (async () => {
-            try {
-              const r = await fetch('/api/auth/session', {credentials:'include'});
-              return r.ok;
-            } catch (e) { return false; }
-          })();
-        """.trimIndent()
-        if (webView.url == null) webView.loadUrl(probe)
-        webView.postDelayed({ webView.evaluateJavascript(js) { s -> cb(s?.contains("true") == true) } }, 300)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

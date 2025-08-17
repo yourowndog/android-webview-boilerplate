@@ -3,7 +3,11 @@
 Minimal Android WebView wrapper that opens the [Daemon GPT](https://chatgpt.com/g/g-68320ed4e74081919f11e7d6a993ee44-the-daemon) by default.
 It runs in desktop mode, supports file uploads, camera and microphone access, back navigation, and login fallback.
 
-First launch: if you’re not signed in, you’ll see a clean landing screen. Tap “Sign in”, complete login, and you’ll be auto-routed to The Daemon. After that, sessions persist.
+## Auth flow
+
+- If logged out, the app opens ChatGPT’s login with `return_to=<your GPT>`.
+- After login you land on your GPT automatically.
+- Sessions persist; no credentials stored.
 
 ## Start URL
 
