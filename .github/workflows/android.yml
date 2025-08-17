@@ -19,18 +19,33 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v3
       - run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+      # Install a Gradle CLI so we can (re)generate the wrapper reliably
       - name: Ensure Gradle CLI
         run: |
           curl -sL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o gradle.zip
           unzip -q gradle.zip
           echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
-      - name: Generate wrapper if missing
+          gradle --version
+
+      # ✅ Always ensure wrapper scripts + jar exist; then make script executable
+      - name: Ensure Gradle Wrapper
         run: |
-          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+          if [ ! -f gradlew ] || [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
             gradle wrapper --gradle-version 8.7
           fi
+          chmod +x gradlew
+          ls -la gradlew gradle/wrapper || true
+
+      # Build; prefer wrapper, but fall back to CLI if something is off
       - name: Build debug
-        run: ./gradlew --no-daemon assembleDebug
+        run: |
+          set -e
+          if [ -x ./gradlew ]; then
+            ./gradlew --no-daemon assembleDebug
+          else
+            echo "Wrapper missing; falling back to Gradle CLI"
+            gradle --no-daemon assembleDebug
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: daemon-portal-debug-apk
