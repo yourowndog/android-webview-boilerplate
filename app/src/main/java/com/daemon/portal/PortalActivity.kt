@@ -20,7 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : AppCompatActivity() {
+class PortalActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private val prefs by lazy { getSharedPreferences("portal", MODE_PRIVATE) }
@@ -88,7 +88,7 @@ class MainActivity : AppCompatActivity() {
                 filePathCallback: ValueCallback<Array<Uri>>?,
                 fileChooserParams: FileChooserParams?
             ): Boolean {
-                this@MainActivity.filePathCallback = filePathCallback
+                this@PortalActivity.filePathCallback = filePathCallback
                 fileChooser.launch(arrayOf("*/*"))
                 return true
             }

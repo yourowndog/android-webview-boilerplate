@@ -1,5 +1,4 @@
 * text=auto eol=lf
-
-*.kt diff=kt
-*.kts diff=kt
+*.kt diff=java
+*.kts diff=java
 *.java diff=java
