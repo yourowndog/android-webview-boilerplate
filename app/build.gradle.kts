@@ -9,14 +9,14 @@ android {
 
     defaultConfig {
         applicationId = "com.daemon.portal"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
-        buildConfigField("String", "HOME_URL", "\"https://chatgpt.com/g/g-XXXXXXXXXXXXXXX-the-daemon\"")
-        buildConfigField("boolean", "FORCE_DESKTOP_MODE", "true")
-        buildConfigField("boolean", "ALLOW_THIRD_PARTY_COOKIES", "true")
+        buildConfigField("String","HOME_URL","\"https://chatgpt.com/g/XXXXXXXX-the-daemon\"")
+        buildConfigField("boolean","FORCE_DESKTOP_MODE","true")
+        buildConfigField("boolean","ALLOW_THIRD_PARTY_COOKIES","true")
     }
 
     buildTypes {
