@@ -35,26 +35,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun getStartUrl(): String = prefs.getString("start_url", BuildConfig.HOME_URL)!!
     private fun setStartUrl(u: String) { prefs.edit().putString("start_url", u).apply() }
-    private fun getTargetAfterLogin(): String? = prefs.getString("target_after_login", null)
-    private fun setTargetAfterLogin(u: String?) { prefs.edit().putString("target_after_login", u).apply() }
     private fun onLoggedIn() {
         isLoggedIn = true
         statusView.text = "Signed in"
-        val target = getTargetAfterLogin()
-        if (target != null) {
-            setTargetAfterLogin(null)
-            webView.post { webView.loadUrl(target) }
-        }
+        webView.post { webView.loadUrl(BuildConfig.LOGIN_REDIRECT_URL) }
     }
 
     private fun onLoggedOut() {
         isLoggedIn = false
         statusView.text = "Not signed in"
-        val current = webView.url
-        if (current != null && Uri.parse(current).path?.startsWith("/g/") == true) {
-            setTargetAfterLogin(current)
-            webView.loadUrl(BuildConfig.HOME_URL)
-        }
+        webView.loadUrl(BuildConfig.HOME_URL)
     }
 
     inner class JsBridge {
