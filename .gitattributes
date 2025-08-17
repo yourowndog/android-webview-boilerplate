@@ -1,5 +1,5 @@
-*.jar binary
-*.png binary
-*.jpg binary
-*.webp binary
-*.keystore binary
+* text=auto eol=lf
+
+*.kt diff=kt
+*.kts diff=kt
+*.java diff=java

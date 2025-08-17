@@ -17,6 +17,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebStorage
+import android.webkit.WebResourceResponse
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -30,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusView: TextView
     private var isLoggedIn = false
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingUrl: String? = null
 
     private val prefs by lazy { getSharedPreferences("portal", MODE_PRIVATE) }
 
@@ -38,13 +40,14 @@ class MainActivity : AppCompatActivity() {
     private fun onLoggedIn() {
         isLoggedIn = true
         statusView.text = "Signed in"
-        webView.post { webView.loadUrl(BuildConfig.LOGIN_REDIRECT_URL) }
+        val target = pendingUrl ?: getStartUrl()
+        pendingUrl = null
+        webView.post { webView.loadUrl(target) }
     }
 
     private fun onLoggedOut() {
         isLoggedIn = false
         statusView.text = "Not signed in"
-        webView.loadUrl(BuildConfig.HOME_URL)
     }
 
     inner class JsBridge {
@@ -133,7 +136,7 @@ class MainActivity : AppCompatActivity() {
         }
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
-        cookieManager.setAcceptThirdPartyCookies(webView, true)
+        cookieManager.setAcceptThirdPartyCookies(webView, BuildConfig.ALLOW_THIRD_PARTY_COOKIES)
         WebStorage.getInstance()
 
         webView.addJavascriptInterface(JsBridge(), "Android")
@@ -174,6 +177,21 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 view.loadUrl(request.url.toString())
                 return true
+            }
+
+            override fun onReceivedHttpError(
+                view: WebView,
+                request: WebResourceRequest,
+                errorResponse: WebResourceResponse,
+            ) {
+                if (request.isForMainFrame) {
+                    val code = errorResponse.statusCode
+                    val url = request.url.toString()
+                    if (url.startsWith("https://chatgpt.com/g/") && (code == 401 || code == 403 || code == 404)) {
+                        pendingUrl = url
+                        view.loadUrl("https://chatgpt.com/")
+                    }
+                }
             }
 
             override fun onPageFinished(view: WebView, url: String) {
